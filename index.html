@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ConnectHealth — EHR Embed Viewer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Inter',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+        .topbar{background:linear-gradient(135deg,#7c3aed,#6d28d9);padding:12px 24px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 12px rgba(124,58,237,.4)}
+        .topbar h1{font-size:16px;font-weight:700;color:#fff;flex:1}
+        .topbar .badge{background:rgba(255,255,255,.2);color:#fff;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600}
+        .tabs{display:flex;background:#1e293b;border-bottom:1px solid #334155}
+        .tab{padding:12px 20px;font-size:13px;font-weight:500;color:#94a3b8;cursor:pointer;border-bottom:2px solid transparent;transition:.2s}
+        .tab:hover{color:#e2e8f0;background:#253347}
+        .tab.active{color:#a78bfa;border-bottom-color:#a78bfa}
+        .panels{padding:20px;max-width:900px;margin:0 auto}
+        .panel{display:none}
+        .panel.active{display:block}
+        .card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:20px;margin-bottom:16px}
+        .card-title{font-size:14px;font-weight:600;color:#a78bfa;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+        .field{margin-bottom:12px}
+        .field-label{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#64748b;margin-bottom:4px}
+        .field-value{font-family:'SF Mono',Monaco,monospace;font-size:12px;color:#cbd5e1;word-break:break-all;background:#0f172a;padding:10px;border-radius:8px;border:1px solid #1e293b;max-height:100px;overflow-y:auto;line-height:1.6}
+        .field-value.lg{font-size:16px;color:#4ade80;background:none;border:none;padding:0}
+        .btn{padding:8px 16px;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;transition:.2s;display:inline-flex;align-items:center;gap:6px}
+        .btn-primary{background:#7c3aed;color:#fff}.btn-primary:hover{background:#6d28d9}
+        .btn-success{background:#059669;color:#fff}.btn-success:hover{background:#047857}
+        .btn-outline{background:transparent;color:#a78bfa;border:1px solid #334155}.btn-outline:hover{background:#253347}
+        .btn-sm{padding:5px 10px;font-size:11px}
+        .btn-copied{background:#16a34a!important}
+        .btn-group{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+        .status{padding:8px 14px;border-radius:8px;font-size:13px;margin-bottom:12px}
+        .status-success{background:rgba(74,222,128,.1);color:#4ade80;border:1px solid rgba(74,222,128,.2)}
+        .status-error{background:rgba(248,113,113,.1);color:#f87171;border:1px solid rgba(248,113,113,.2)}
+        .status-info{background:rgba(96,165,250,.1);color:#60a5fa;border:1px solid rgba(96,165,250,.2)}
+        .patient-header{display:flex;align-items:center;gap:16px;margin-bottom:16px}
+        .avatar{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a78bfa);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff}
+        .patient-name{font-size:18px;font-weight:700;color:#f1f5f9}
+        .patient-meta{font-size:12px;color:#94a3b8;margin-top:2px}
+        .resource-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-top:12px}
+        .resource-btn{padding:12px;background:#0f172a;border:1px solid #334155;border-radius:10px;cursor:pointer;transition:.2s;text-align:left}
+        .resource-btn:hover{border-color:#7c3aed;background:#1a2744}
+        .resource-btn .r-name{font-size:13px;font-weight:600;color:#e2e8f0}
+        .resource-btn .r-desc{font-size:11px;color:#64748b;margin-top:4px}
+        .json-view{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:16px;margin-top:12px;max-height:400px;overflow-y:auto;font-family:'SF Mono',Monaco,monospace;font-size:12px;color:#cbd5e1;white-space:pre-wrap;line-height:1.6}
+        .empty-state{text-align:center;padding:48px 20px;color:#475569}
+        .empty-state .icon{font-size:40px;margin-bottom:12px}
+        .empty-state p{font-size:14px}
+        .loading{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.2);border-radius:50%;border-top-color:#a78bfa;animation:spin .6s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .divider{height:1px;background:#334155;margin:16px 0}
+        .chip{display:inline-block;padding:3px 8px;background:#253347;border-radius:6px;font-size:11px;color:#94a3b8;margin:2px}
+        .two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+        @media(max-width:600px){.two-col{grid-template-columns:1fr}.resource-grid{grid-template-columns:1fr}}
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <span style="font-size:22px">🔐</span>
+        <h1>ConnectHealth — EHR Embed Viewer</h1>
+        <span class="badge" id="ehrBadge">Veradigm EHR</span>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('token')">🎫 Token</div>
+        <div class="tab" onclick="switchTab('patient')">👤 Patient</div>
+        <div class="tab" onclick="switchTab('fhir')">🔥 FHIR Explorer</div>
+        <div class="tab" onclick="switchTab('raw')">📋 Raw Data</div>
+    </div>
+
+    <div class="panels">
+        <!-- TOKEN PANEL -->
+        <div class="panel active" id="panel-token">
+            <div id="tokenContent">
+                <div class="empty-state"><div class="icon">⏳</div><p>Waiting for EHR launch redirect with OAuth parameters...</p></div>
+            </div>
+        </div>
+
+        <!-- PATIENT PANEL -->
+        <div class="panel" id="panel-patient">
+            <div id="patientContent">
+                <div class="empty-state"><div class="icon">👤</div><p>No patient context available yet.</p></div>
+            </div>
+        </div>
+
+        <!-- FHIR EXPLORER PANEL -->
+        <div class="panel" id="panel-fhir">
+            <div class="card">
+                <div class="card-title">🔥 FHIR Resource Explorer</div>
+                <p style="font-size:12px;color:#64748b;margin-bottom:12px">Query FHIR resources using the access token from the EHR launch.</p>
+                <div class="field">
+                    <div class="field-label">FHIR Base URL (iss)</div>
+                    <input type="text" id="fhirBaseUrl" style="width:100%;padding:8px 12px;background:#0f172a;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:13px" placeholder="Auto-detected from launch">
+                </div>
+                <div class="field">
+                    <div class="field-label">Custom Query Path</div>
+                    <div style="display:flex;gap:8px">
+                        <input type="text" id="customQuery" style="flex:1;padding:8px 12px;background:#0f172a;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:13px" placeholder="e.g. Patient/123 or Observation?patient=123&category=vital-signs">
+                        <button class="btn btn-primary" onclick="runCustomQuery()">Query</button>
+                    </div>
+                </div>
+                <div class="divider"></div>
+                <div class="card-title" style="font-size:12px">Quick Access Resources</div>
+                <div class="resource-grid">
+                    <div class="resource-btn" onclick="fetchResource('Patient')"><div class="r-name">👤 Patient</div><div class="r-desc">Demographics</div></div>
+                    <div class="resource-btn" onclick="fetchResource('Condition')"><div class="r-name">🩺 Conditions</div><div class="r-desc">Active problems</div></div>
+                    <div class="resource-btn" onclick="fetchResource('AllergyIntolerance')"><div class="r-name">⚠️ Allergies</div><div class="r-desc">Allergy list</div></div>
+                    <div class="resource-btn" onclick="fetchResource('MedicationRequest')"><div class="r-name">💊 Medications</div><div class="r-desc">Active meds</div></div>
+                    <div class="resource-btn" onclick="fetchResource('Observation', 'category=vital-signs')"><div class="r-name">❤️ Vitals</div><div class="r-desc">Vital signs</div></div>
+                    <div class="resource-btn" onclick="fetchResource('Observation', 'category=laboratory')"><div class="r-name">🧪 Labs</div><div class="r-desc">Lab results</div></div>
+                    <div class="resource-btn" onclick="fetchResource('Encounter')"><div class="r-name">📋 Encounters</div><div class="r-desc">Visit history</div></div>
+                    <div class="resource-btn" onclick="fetchResource('Immunization')"><div class="r-name">💉 Immunizations</div><div class="r-desc">Vaccine records</div></div>
+                    <div class="resource-btn" onclick="fetchResource('Procedure')"><div class="r-name">🔬 Procedures</div><div class="r-desc">Procedure history</div></div>
+                    <div class="resource-btn" onclick="fetchResource('CarePlan')"><div class="r-name">📝 Care Plans</div><div class="r-desc">Active plans</div></div>
+                    <div class="resource-btn" onclick="fetchResource('DiagnosticReport')"><div class="r-name">📊 Reports</div><div class="r-desc">Diagnostic reports</div></div>
+                    <div class="resource-btn" onclick="fetchResource('DocumentReference')"><div class="r-name">📄 Documents</div><div class="r-desc">Clinical docs</div></div>
+                </div>
+            </div>
+            <div id="fhirResult"></div>
+        </div>
+
+        <!-- RAW DATA PANEL -->
+        <div class="panel" id="panel-raw">
+            <div class="card">
+                <div class="card-title">📋 All URL Parameters</div>
+                <div id="rawParams" class="json-view">No parameters received.</div>
+            </div>
+            <div class="card">
+                <div class="card-title">📋 Stored OAuth Data</div>
+                <div id="rawStored" class="json-view">No stored data.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ── State ──
+        let oauthData = {};
+        const params = new URLSearchParams(window.location.search);
+
+        // ── Init ──
+        document.addEventListener('DOMContentLoaded', () => {
+            parseParams();
+            renderTokenPanel();
+            renderRawPanel();
+            if (oauthData.iss) document.getElementById('fhirBaseUrl').value = oauthData.iss;
+        });
+
+        function parseParams() {
+            params.forEach((v, k) => { oauthData[k] = v; });
+            const stored = sessionStorage.getItem('embedOAuth');
+            if (stored) oauthData = { ...JSON.parse(stored), ...oauthData };
+            if (Object.keys(oauthData).length > 0) sessionStorage.setItem('embedOAuth', JSON.stringify(oauthData));
+        }
+
+        // ── Tabs ──
+        function switchTab(name) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.getElementById('panel-' + name).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // ── Token Panel ──
+        function renderTokenPanel() {
+            const el = document.getElementById('tokenContent');
+            const success = oauthData.success;
+            const error = oauthData.error;
+            if (!success && !error && !oauthData.access_token) return;
+
+            let html = '';
+            if (success === 'true' || oauthData.access_token) {
+                html += '<div class="status status-success">✅ OAuth flow completed successfully</div>';
+            } else if (error) {
+                html += `<div class="status status-error">❌ Error: ${esc(error)} — ${esc(oauthData.message || oauthData.error_description || '')}</div>`;
+                el.innerHTML = html; return;
+            }
+
+            // Access Token card
+            if (oauthData.access_token) {
+                html += `<div class="card"><div class="card-title">🎫 Access Token</div>`;
+                html += `<div class="field-value" style="max-height:80px">${esc(oauthData.access_token)}</div>`;
+                html += `<div class="btn-group"><button class="btn btn-primary btn-sm" onclick="copyText('${escAttr(oauthData.access_token)}', this)">📋 Copy Token</button></div></div>`;
+            }
+
+            // Context cards
+            html += '<div class="two-col">';
+            const contextFields = [
+                ['token_id', 'Token ID'], ['patient', 'Patient ID'], ['encounter', 'Encounter ID'],
+                ['expires_in', 'Expires In (sec)'], ['scope', 'Scopes'], ['token_type', 'Token Type'],
+                ['id_token', 'ID Token'], ['refresh_token', 'Refresh Token'], ['iss', 'ISS (FHIR Base)']
+            ];
+            contextFields.forEach(([key, label]) => {
+                if (oauthData[key]) {
+                    html += `<div class="card"><div class="card-title" style="font-size:12px">${label}</div>`;
+                    if (key === 'scope') {
+                        html += oauthData[key].split(' ').map(s => `<span class="chip">${esc(s)}</span>`).join('');
+                    } else if (key === 'patient' || key === 'encounter') {
+                        html += `<div class="field-value lg">${esc(oauthData[key])}</div>`;
+                    } else {
+                        html += `<div class="field-value">${esc(oauthData[key])}</div>`;
+                    }
+                    if (['id_token', 'refresh_token'].includes(key)) {
+                        html += `<div class="btn-group"><button class="btn btn-outline btn-sm" onclick="copyText('${escAttr(oauthData[key])}', this)">Copy</button></div>`;
+                    }
+                    html += '</div>';
+                }
+            });
+            html += '</div>';
+
+            // Auto-fetch patient
+            if (oauthData.patient) {
+                setTimeout(() => fetchPatientForPanel(), 300);
+            }
+
+            el.innerHTML = html;
+        }
+
+        // ── Patient Panel ──
+        async function fetchPatientForPanel() {
+            const token = oauthData.access_token;
+            const patientId = oauthData.patient;
+            const iss = oauthData.iss || document.getElementById('fhirBaseUrl').value;
+            if (!token || !patientId || !iss) return;
+
+            const el = document.getElementById('patientContent');
+            el.innerHTML = '<div class="status status-info"><span class="loading"></span> Fetching patient details...</div>';
+
+            try {
+                const baseUrl = iss.endsWith('/') ? iss : iss + '/';
+                const res = await fetch(baseUrl + 'Patient/' + patientId, {
+                    headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/fhir+json' }
+                });
+                if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+                const patient = await res.json();
+                renderPatient(patient);
+            } catch (err) {
+                el.innerHTML = `<div class="status status-error">Failed to fetch patient: ${esc(err.message)}</div>
+                    <div class="card"><div class="card-title">ℹ️ Note</div>
+                    <p style="font-size:13px;color:#94a3b8">FHIR calls from the browser may be blocked by CORS. The patient ID from the launch context is: <strong style="color:#4ade80">${esc(patientId)}</strong></p></div>`;
+            }
+        }
+
+        function renderPatient(p) {
+            const el = document.getElementById('patientContent');
+            const name = p.name?.[0] || {};
+            const fullName = [name.given?.join(' '), name.family].filter(Boolean).join(' ') || 'Unknown';
+            const initials = (name.given?.[0]?.[0] || '') + (name.family?.[0] || '');
+            const dob = p.birthDate || 'N/A';
+            const gender = p.gender || 'N/A';
+            const mrn = p.identifier?.find(i => i.type?.coding?.[0]?.code === 'MR')?.value || p.id;
+
+            let html = `<div class="card">
+                <div class="patient-header">
+                    <div class="avatar">${esc(initials.toUpperCase())}</div>
+                    <div><div class="patient-name">${esc(fullName)}</div>
+                    <div class="patient-meta">DOB: ${esc(dob)} · Gender: ${esc(gender)} · MRN: ${esc(mrn)}</div></div>
+                </div><div class="divider"></div><div class="two-col">`;
+
+            const details = [
+                ['ID', p.id], ['Status', p.active ? 'Active' : 'Inactive'],
+                ['Language', p.communication?.[0]?.language?.coding?.[0]?.display || 'N/A'],
+                ['Marital Status', p.maritalStatus?.coding?.[0]?.display || 'N/A'],
+            ];
+            const addr = p.address?.[0];
+            if (addr) details.push(['Address', [addr.line?.join(', '), addr.city, addr.state, addr.postalCode].filter(Boolean).join(', ')]);
+            const phone = p.telecom?.find(t => t.system === 'phone');
+            if (phone) details.push(['Phone', phone.value]);
+            const email = p.telecom?.find(t => t.system === 'email');
+            if (email) details.push(['Email', email.value]);
+
+            details.forEach(([label, val]) => {
+                html += `<div class="field"><div class="field-label">${label}</div><div style="font-size:13px;color:#e2e8f0">${esc(val || 'N/A')}</div></div>`;
+            });
+
+            html += '</div></div>';
+            html += `<div class="card"><div class="card-title">📋 Full FHIR Patient Resource</div>
+                <button class="btn btn-outline btn-sm" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">Toggle JSON</button>
+                <div class="json-view" style="display:none">${esc(JSON.stringify(p, null, 2))}</div></div>`;
+
+            el.innerHTML = html;
+        }
+
+        // ── FHIR Explorer ──
+        async function fetchResource(type, extraParams) {
+            const token = oauthData.access_token;
+            const patientId = oauthData.patient;
+            let iss = document.getElementById('fhirBaseUrl').value || oauthData.iss;
+            if (!token) { showFhirResult('error', 'No access token available'); return; }
+            if (!iss) { showFhirResult('error', 'No FHIR Base URL (iss) available'); return; }
+
+            const baseUrl = iss.endsWith('/') ? iss : iss + '/';
+            let url;
+            if (type === 'Patient' && patientId) {
+                url = baseUrl + 'Patient/' + patientId;
+            } else if (patientId) {
+                url = baseUrl + type + '?patient=' + patientId + (extraParams ? '&' + extraParams : '');
+            } else {
+                url = baseUrl + type + (extraParams ? '?' + extraParams : '');
+            }
+
+            showFhirResult('info', `<span class="loading"></span> Fetching ${type}...`);
+
+            try {
+                const res = await fetch(url, {
+                    headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/fhir+json' }
+                });
+                const data = await res.json();
+                const count = data.total !== undefined ? data.total : (data.entry?.length || (data.resourceType ? 1 : 0));
+                let html = `<div class="card"><div class="card-title">🔥 ${esc(type)} ${count !== undefined ? `<span class="badge" style="background:#253347;color:#a78bfa">${count} results</span>` : ''}</div>`;
+                html += `<div class="field"><div class="field-label">Request URL</div><div class="field-value">${esc(url)}</div></div>`;
+                html += `<button class="btn btn-outline btn-sm" onclick="copyText(JSON.stringify(${escAttr(JSON.stringify(data))}), this)">📋 Copy JSON</button>`;
+                html += `<div class="json-view" style="margin-top:12px">${esc(JSON.stringify(data, null, 2))}</div></div>`;
+                document.getElementById('fhirResult').innerHTML = html;
+            } catch (err) {
+                showFhirResult('error', `Failed: ${err.message}. FHIR calls from the browser may be blocked by CORS.`);
+            }
+        }
+
+        async function runCustomQuery() {
+            const path = document.getElementById('customQuery').value.trim();
+            if (!path) return;
+            const parts = path.split('?');
+            fetchResource(parts[0], parts[1] || '');
+        }
+
+        function showFhirResult(type, msg) {
+            document.getElementById('fhirResult').innerHTML = `<div class="status status-${type}">${msg}</div>`;
+        }
+
+        // ── Raw Panel ──
+        function renderRawPanel() {
+            const allParams = {};
+            params.forEach((v, k) => { allParams[k] = v; });
+            document.getElementById('rawParams').textContent = JSON.stringify(allParams, null, 2);
+            document.getElementById('rawStored').textContent = JSON.stringify(oauthData, null, 2);
+        }
+
+        // ── Utilities ──
+        function copyText(text, btn) {
+            navigator.clipboard.writeText(text).then(() => {
+                const orig = btn.textContent; btn.textContent = '✅ Copied!'; btn.classList.add('btn-copied');
+                setTimeout(() => { btn.textContent = orig; btn.classList.remove('btn-copied'); }, 2000);
+            });
+        }
+        function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
+        function escAttr(s) { return s.replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+    </script>
+</body>
+</html>
